@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # 1. PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: virtual-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: virtual_user
+      POSTGRES_PASSWORD: virtual_secure_password
+      POSTGRES_DB: virtual_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U virtual_user -d virtual_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. VIRTUAL Node.js Backend & Signaling Server
+  backend:
+    build:
+      context: ../../backend
+      dockerfile: ../infrastructure/docker/Dockerfile.backend
+    container_name: virtual-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: 4000
+      NODE_ENV: production
+      DATABASE_URL: "postgresql://virtual_user:virtual_secure_password@postgres:5432/virtual_db?schema=public"
+      JWT_SECRET: "prod_jwt_super_secret_virtual_app_2026_xyz"
+      REFRESH_TOKEN_SECRET: "prod_refresh_super_secret_virtual_app_2026_abc"
+      STUN_SERVER_URL: "stun:coturn:3478"
+      TURN_SERVER_URL: "turn:coturn:3478"
+      TURN_USERNAME: "virtual_turn_user"
+      TURN_PASSWORD: "virtual_turn_secret_auth_token_99"
+      CORS_ORIGIN: "*"
+    ports:
+      - "4000:4000"
+
+  # 3. Coturn STUN & TURN Relay Server
+  coturn:
+    image: coturn/coturn:latest
+    container_name: virtual-coturn
+    restart: unless-stopped
+    volumes:
+      - ../coturn/turnserver.conf:/etc/turnserver.conf:ro
+    network_mode: "host" # Coturn requires host networking or explicit port mapping for dynamic WebRTC UDP relay ports
+    command: ["-c", "/etc/turnserver.conf"]
+
+volumes:
+  postgres_data:

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VIRTUAL</string>
+    <string name="app_tagline">Secure Remote Live Camera</string>
+    <string name="camera_device">Camera Device</string>
+    <string name="viewer_device">Viewer Device</string>
+    <string name="camera_permission_rationale">VIRTUAL requires Camera access to stream live video directly to your authorized viewer device. Video travels directly via WebRTC and is never stored on servers.</string>
+    <string name="camera_notification_title">VIRTUAL Camera Active</string>
+    <string name="camera_notification_text">Streaming live video to paired viewer</string>
+    <string name="action_stop_streaming">Stop Streaming</string>
+    <string name="camera_conflict_message">Camera temporarily unavailable. Another application is currently using the camera. VIRTUAL will retry automatically when released.</string>
+</resources>

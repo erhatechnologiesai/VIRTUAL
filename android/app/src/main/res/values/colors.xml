@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Professional Blue + White Palette -->
+    <color name="primary_blue">#1E40AF</color>
+    <color name="primary_blue_vibrant">#2563EB</color>
+    <color name="primary_blue_light">#3B82F6</color>
+    <color name="primary_blue_subtle">#EFF6FF</color>
+
+    <color name="white">#FFFFFF</color>
+    <color name="background_light">#F8FAFC</color>
+    <color name="card_surface">#FFFFFF</color>
+    <color name="border_light">#E2E8F0</color>
+
+    <!-- Neutral Text -->
+    <color name="text_primary">#0F172A</color>
+    <color name="text_secondary">#64748B</color>
+    <color name="text_tertiary">#94A3B8</color>
+
+    <!-- Status Accents -->
+    <color name="status_online">#10B981</color>
+    <color name="status_offline">#EF4444</color>
+    <color name="status_warning">#F59E0B</color>
+</resources>

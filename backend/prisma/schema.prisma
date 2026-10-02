@@ -1,0 +1,191 @@
+// VIRTUAL Database Schema - PostgreSQL (Prisma)
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum DeviceType {
+  CAMERA
+  VIEWER
+}
+
+enum DeviceStatus {
+  ONLINE
+  OFFLINE
+  STREAMING
+  CONFLICT_BUSY
+}
+
+enum PairingStatus {
+  PENDING
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+
+enum SessionStatus {
+  ACTIVE
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id            String      @id @default(uuid())
+  name          String
+  email         String      @unique
+  passwordHash  String      @map("password_hash")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  devices       Device[]
+  auditLogs     AuditLog[]
+
+  @@map("users")
+}
+
+model Device {
+  id            String       @id @default(uuid())
+  userId        String       @map("user_id")
+  deviceUuid    String       @unique @map("device_uuid") // e.g. VRT-CAM-XXXXXXXX
+  deviceName    String       @map("device_name")
+  deviceType    DeviceType   @map("device_type")
+  platform      String       @default("ANDROID")
+  appVersion    String       @default("1.0.0") @map("app_version")
+  status        DeviceStatus @default(OFFLINE)
+  lastSeen      DateTime     @default(now()) @map("last_seen")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Specific details if camera
+  cameraDetail  CameraDevice?
+
+  // Pairings where this device is camera or viewer
+  asCameraPairings Pairing[] @relation("CameraPairings")
+  asViewerPairings Pairing[] @relation("ViewerPairings")
+
+  // Sessions
+  cameraSessions   Session[] @relation("CameraSessions")
+  viewerSessions   Session[] @relation("ViewerSessions")
+
+  pushTokens       PushToken[]
+  settings         DeviceSetting?
+  auditLogs        AuditLog[]
+
+  @@index([userId])
+  @@index([deviceUuid])
+  @@index([deviceType, status])
+  @@map("devices")
+}
+
+model CameraDevice {
+  id                String    @id @default(uuid())
+  deviceId          String    @unique @map("device_id")
+  cameraType        String    @default("BACK") @map("camera_type") // FRONT, BACK
+  resolution        String    @default("720p")
+  fps               Int       @default(30)
+  audioEnabled      Boolean   @default(false) @map("audio_enabled")
+  streamStatus      String    @default("IDLE") @map("stream_status") // IDLE, STREAMING, CONFLICT_BUSY, ERROR
+  batteryLevel      Int       @default(100) @map("battery_level")
+  networkType       String    @default("WIFI") @map("network_type") // WIFI, 4G, 5G, NONE
+  lastStreamStarted DateTime? @map("last_stream_started")
+  lastStreamEnded   DateTime? @map("last_stream_ended")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  device            Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@map("camera_devices")
+}
+
+model Pairing {
+  id               String        @id @default(uuid())
+  cameraDeviceId   String        @map("camera_device_id")
+  viewerDeviceId   String        @map("viewer_device_id")
+  pairingStatus    PairingStatus @default(PENDING) @map("pairing_status")
+  pairingTokenHash String?       @map("pairing_token_hash")
+  pairingCode      String?       @map("pairing_code") // Human readable code e.g. ABC-123
+  expiresAt        DateTime?     @map("expires_at")
+  pairedAt         DateTime?     @map("paired_at")
+  revokedAt        DateTime?     @map("revoked_at")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  cameraDevice     Device        @relation("CameraPairings", fields: [cameraDeviceId], references: [id], onDelete: Cascade)
+  viewerDevice     Device        @relation("ViewerPairings", fields: [viewerDeviceId], references: [id], onDelete: Cascade)
+
+  @@unique([cameraDeviceId, viewerDeviceId])
+  @@index([cameraDeviceId])
+  @@index([viewerDeviceId])
+  @@index([pairingCode])
+  @@map("pairings")
+}
+
+model Session {
+  id               String        @id @default(uuid())
+  cameraDeviceId   String        @map("camera_device_id")
+  viewerDeviceId   String        @map("viewer_device_id")
+  startedAt        DateTime      @default(now()) @map("started_at")
+  endedAt          DateTime?     @map("ended_at")
+  status           SessionStatus @default(ACTIVE)
+  disconnectReason String?       @map("disconnect_reason")
+  createdAt        DateTime      @default(now()) @map("created_at")
+
+  cameraDevice     Device        @relation("CameraSessions", fields: [cameraDeviceId], references: [id], onDelete: Cascade)
+  viewerDevice     Device        @relation("ViewerSessions", fields: [viewerDeviceId], references: [id], onDelete: Cascade)
+
+  @@index([cameraDeviceId, status])
+  @@index([viewerDeviceId, status])
+  @@map("sessions")
+}
+
+model PushToken {
+  id        String   @id @default(uuid())
+  deviceId  String   @map("device_id")
+  provider  String   @default("FCM")
+  token     String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  device    Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@map("push_tokens")
+}
+
+model DeviceSetting {
+  id            String   @id @default(uuid())
+  deviceId      String   @unique @map("device_id")
+  videoQuality  String   @default("720p") @map("video_quality")
+  fps           Int      @default(30)
+  audioEnabled  Boolean  @default(false) @map("audio_enabled")
+  autoReconnect Boolean  @default(true) @map("auto_reconnect")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  device        Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@map("device_settings")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?  @map("user_id")
+  deviceId  String?  @map("device_id")
+  eventType String   @map("event_type")
+  ipAddress String?  @map("ip_address")
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  device    Device?  @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([deviceId])
+  @@index([eventType])
+  @@map("audit_logs")
+}

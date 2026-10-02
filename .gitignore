@@ -1,0 +1,27 @@
+# Environment files
+.env
+.env.local
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Backend Build
+backend/dist/
+
+# Android & Gradle
+.gradle/
+build/
+*/build/
+*.iml
+.idea/
+local.properties
+.DS_Store
+
+# Coturn / Certificates
+*.pem
+*.key
+*.crt
