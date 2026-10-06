@@ -21,8 +21,9 @@ class SettingsRepository(private val context: Context) {
         try {
             val deviceId = storage.deviceId ?: return@withContext Result.failure(Exception("Device not registered"))
             val response = api.getSettings(deviceId)
-            if (response.isSuccessful && response.body()?.data != null) {
-                Result.success(response.body()!!.data!)
+            val setting = response.body()?.data
+            if (response.isSuccessful && setting != null) {
+                Result.success(setting)
             } else {
                 Result.failure(Exception(response.body()?.error ?: "Failed to fetch settings"))
             }
@@ -46,8 +47,9 @@ class SettingsRepository(private val context: Context) {
             autoReconnect?.let { body["autoReconnect"] = it }
 
             val response = api.updateSettings(deviceId, body)
-            if (response.isSuccessful && response.body()?.data != null) {
-                Result.success(response.body()!!.data!)
+            val setting = response.body()?.data
+            if (response.isSuccessful && setting != null) {
+                Result.success(setting)
             } else {
                 Result.failure(Exception(response.body()?.error ?: "Failed to update settings"))
             }

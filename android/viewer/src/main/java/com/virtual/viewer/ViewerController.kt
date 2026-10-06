@@ -66,15 +66,18 @@ class ViewerController(
         }
     }
 
-    private suspend fun fetchIceServers() = withContext(Dispatchers.IO) {
-        try {
-            val response = ApiClient.getService(context).getIceServers()
-            if (response.isSuccessful && response.body()?.data != null) {
-                val servers = response.body()!!.data!!.iceServers
-                webRtcManager?.setIceServers(servers)
+    private suspend fun fetchIceServers() {
+        withContext(Dispatchers.IO) {
+            try {
+                val response = ApiClient.getService(context).getIceServers()
+                val data = response.body()?.data
+                if (response.isSuccessful && data != null) {
+                    val servers = data.iceServers
+                    webRtcManager?.setIceServers(servers)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Using default STUN server: ${e.message}")
             }
-        } catch (e: Exception) {
-            Log.w(TAG, "Using default STUN server: ${e.message}")
         }
     }
 

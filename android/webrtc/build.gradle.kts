@@ -25,7 +25,7 @@ dependencies {
     implementation(project(":core"))
 
     implementation(libs.androidx.core.ktx)
-    implementation(libs.webrtc)
+    api(libs.webrtc)
     implementation(libs.socketio.client)
     implementation(libs.gson)
     implementation(libs.kotlinx.coroutines.android)

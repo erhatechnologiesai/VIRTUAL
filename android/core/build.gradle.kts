@@ -22,14 +22,14 @@ android {
 }
 
 dependencies {
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.retrofit)
-    implementation(libs.retrofit.converter.gson)
-    implementation(libs.okhttp.logging)
-    implementation(libs.socketio.client)
-    implementation(libs.androidx.security.crypto)
-    implementation(libs.gson)
-    implementation(libs.kotlinx.coroutines.android)
+    api(libs.androidx.core.ktx)
+    api(libs.retrofit)
+    api(libs.retrofit.converter.gson)
+    api(libs.okhttp.logging)
+    api(libs.socketio.client)
+    api(libs.androidx.security.crypto)
+    api(libs.gson)
+    api(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit)
 }

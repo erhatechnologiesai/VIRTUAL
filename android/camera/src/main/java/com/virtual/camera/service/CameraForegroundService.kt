@@ -262,11 +262,15 @@ class CameraForegroundService : Service(), SignalingListener, WebRtcEvents, Came
 
     override fun onLocalDescriptionGenerated(sdp: SessionDescription) {
         currentViewerDeviceId?.let { viewerId ->
-            if (sdp.type == SessionDescription.Type.ANSWER) {
-                signalingClient?.sendAnswer(viewerId, sdp.description, currentSessionId)
-                signalingClient?.sendStreamStarted(viewerId, currentResolution, currentFps)
-            } else if (sdp.type == SessionDescription.Type.OFFER) {
-                signalingClient?.sendOffer(viewerId, sdp.description, currentSessionId)
+            when (sdp.type) {
+                SessionDescription.Type.ANSWER -> {
+                    signalingClient?.sendAnswer(viewerId, sdp.description, currentSessionId)
+                    signalingClient?.sendStreamStarted(viewerId, currentResolution, currentFps)
+                }
+                SessionDescription.Type.OFFER -> {
+                    signalingClient?.sendOffer(viewerId, sdp.description, currentSessionId)
+                }
+                else -> {}
             }
         }
     }

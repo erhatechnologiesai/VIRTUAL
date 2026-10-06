@@ -18,9 +18,10 @@ class PairingRepository(private val context: Context) {
         try {
             val cameraId = storage.deviceId ?: return@withContext Result.failure(Exception("Device not registered"))
             val response = api.createPairing(mapOf("cameraDeviceId" to cameraId))
+            val data = response.body()?.data
 
-            if (response.isSuccessful && response.body()?.data != null) {
-                Result.success(response.body()!!.data!)
+            if (response.isSuccessful && data != null) {
+                Result.success(data)
             } else {
                 val errorMsg = response.body()?.error ?: "Failed to generate pairing QR"
                 Result.failure(Exception(errorMsg))
@@ -46,8 +47,8 @@ class PairingRepository(private val context: Context) {
             }
 
             val response = api.joinPairing(body)
-            if (response.isSuccessful && response.body()?.data != null) {
-                val pairing = response.body()!!.data!
+            val pairing = response.body()?.data
+            if (response.isSuccessful && pairing != null) {
                 // Save pairing permanently in local secure storage
                 val cameraName = pairing.cameraDevice?.deviceName ?: "Home Camera"
                 storage.savePairing(pairing.cameraDeviceId, cameraName)
@@ -80,8 +81,9 @@ class PairingRepository(private val context: Context) {
     suspend fun getActivePairings(): Result<List<PairingInfo>> = withContext(Dispatchers.IO) {
         try {
             val response = api.getPairings()
-            if (response.isSuccessful && response.body()?.data != null) {
-                Result.success(response.body()!!.data!)
+            val list = response.body()?.data
+            if (response.isSuccessful && list != null) {
+                Result.success(list)
             } else {
                 Result.failure(Exception(response.body()?.error ?: "Failed to fetch pairings"))
             }

@@ -13,8 +13,9 @@ class ViewerRepository(private val context: Context) {
     suspend fun getPairedCameras(): Result<List<Device>> = withContext(Dispatchers.IO) {
         try {
             val response = api.getPairedCameras()
-            if (response.isSuccessful && response.body()?.data != null) {
-                Result.success(response.body()!!.data!)
+            val data = response.body()?.data
+            if (response.isSuccessful && data != null) {
+                Result.success(data)
             } else {
                 Result.failure(Exception(response.body()?.error ?: "Failed to load cameras"))
             }
@@ -26,8 +27,9 @@ class ViewerRepository(private val context: Context) {
     suspend fun getCameraStatus(cameraId: String): Result<Map<String, Any>> = withContext(Dispatchers.IO) {
         try {
             val response = api.getCameraStatus(cameraId)
-            if (response.isSuccessful && response.body()?.data != null) {
-                Result.success(response.body()!!.data!)
+            val data = response.body()?.data
+            if (response.isSuccessful && data != null) {
+                Result.success(data)
             } else {
                 Result.failure(Exception(response.body()?.error ?: "Failed to load status"))
             }

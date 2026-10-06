@@ -18,8 +18,8 @@ class AuthRepository(private val context: Context) {
     suspend fun register(name: String, email: String, pass: String): Result<AuthResponse> = withContext(Dispatchers.IO) {
         try {
             val response = api.register(mapOf("name" to name, "email" to email, "password" to pass))
-            if (response.isSuccessful && response.body()?.data != null) {
-                val data = response.body()!!.data!
+            val data = response.body()?.data
+            if (response.isSuccessful && data != null) {
                 saveAuthData(data)
                 Result.success(data)
             } else {
@@ -34,8 +34,8 @@ class AuthRepository(private val context: Context) {
     suspend fun login(email: String, pass: String): Result<AuthResponse> = withContext(Dispatchers.IO) {
         try {
             val response = api.login(mapOf("email" to email, "password" to pass))
-            if (response.isSuccessful && response.body()?.data != null) {
-                val data = response.body()!!.data!
+            val data = response.body()?.data
+            if (response.isSuccessful && data != null) {
                 saveAuthData(data)
                 Result.success(data)
             } else {
@@ -62,8 +62,8 @@ class AuthRepository(private val context: Context) {
             )
 
             val response = api.registerDevice(body)
-            if (response.isSuccessful && response.body()?.data != null) {
-                val device = response.body()!!.data!
+            val device = response.body()?.data
+            if (response.isSuccessful && device != null) {
                 storage.deviceId = device.id
                 storage.deviceUuid = device.deviceUuid
                 storage.deviceRole = role
