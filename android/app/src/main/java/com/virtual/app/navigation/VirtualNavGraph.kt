@@ -26,7 +26,7 @@ fun VirtualNavGraph(
 ) {
     NavHost(
         navController = navController,
-        startDestination = Screen.Splash.route,
+        startDestination = Screen.DeviceRole.route,
         modifier = modifier
     ) {
         // Screen 1: Splash
@@ -41,15 +41,11 @@ fun VirtualNavGraph(
             )
         }
 
-        // Screen 2: Welcome
+        // Screen 2: Welcome (Redirected directly to DeviceRoleScreen)
         composable(Screen.Welcome.route) {
-            WelcomeScreen(
+            DeviceRoleScreen(
                 authRepository = authRepository,
-                onNavigate = { route ->
-                    navController.navigate(route) {
-                        popUpTo(Screen.Welcome.route) { inclusive = true }
-                    }
-                }
+                onNavigate = { route -> navController.navigate(route) }
             )
         }
 
@@ -169,7 +165,7 @@ fun VirtualNavGraph(
                 authRepository = authRepository,
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateWelcome = {
-                    navController.navigate(Screen.Welcome.route) {
+                    navController.navigate(Screen.DeviceRole.route) {
                         popUpTo(0) { inclusive = true }
                     }
                 }

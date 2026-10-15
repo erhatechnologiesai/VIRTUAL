@@ -8,12 +8,15 @@ import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -62,6 +65,25 @@ fun CameraDashboardScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        if (!isStreaming) {
+            val intent = Intent(context, CameraForegroundService::class.java).apply {
+                action = CameraForegroundService.ACTION_START_STREAM
+                putExtra(CameraForegroundService.EXTRA_RESOLUTION, quality)
+                putExtra(CameraForegroundService.EXTRA_FPS, 30)
+                putExtra(CameraForegroundService.EXTRA_FRONT_FACING, false)
+            }
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+                isStreaming = true
+            } catch (e: Exception) {}
+        }
+    }
+
     fun toggleStreaming() {
         val intent = Intent(context, CameraForegroundService::class.java).apply {
             action = if (isStreaming) {
@@ -89,11 +111,13 @@ fun CameraDashboardScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(VirtualWhite)
-            .padding(20.dp)
+            .background(PremiumBackgroundGradient)
     ) {
         Column(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             Column {
@@ -106,23 +130,35 @@ fun CameraDashboardScreen(
                     Column {
                         Text(
                             text = "VIRTUAL",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = VirtualBluePrimary
+                            fontSize = 26.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = VirtualCyanGlow
                         )
                         Text(
                             text = "Camera Device: ${storage.deviceUuid ?: "VRT-CAM"}",
                             fontSize = 13.sp,
-                            color = VirtualTextSecondary
+                            fontWeight = FontWeight.Medium,
+                            color = VirtualTextWhiteHigh.copy(alpha = 0.8f)
                         )
                     }
 
                     Row {
-                        IconButton(onClick = { onNavigate(Screen.PairingQr.route) }) {
-                            Text("📱", fontSize = 20.sp)
+                        IconButton(
+                            onClick = { onNavigate(Screen.PairingQr.route) },
+                            modifier = Modifier
+                                .padding(end = 6.dp)
+                                .background(VirtualGlassBg, CircleShape)
+                                .border(1.dp, VirtualGlassBorder, CircleShape)
+                        ) {
+                            Text("📱", fontSize = 18.sp)
                         }
-                        IconButton(onClick = { onNavigate(Screen.Settings.route) }) {
-                            Text("⚙", fontSize = 20.sp)
+                        IconButton(
+                            onClick = { onNavigate(Screen.Settings.route) },
+                            modifier = Modifier
+                                .background(VirtualGlassBg, CircleShape)
+                                .border(1.dp, VirtualGlassBorder, CircleShape)
+                        ) {
+                            Text("⚙", fontSize = 18.sp)
                         }
                     }
                 }
@@ -132,19 +168,20 @@ fun CameraDashboardScreen(
                 // Camera Status Card
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = VirtualBackground),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, VirtualBorder)
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = VirtualGlassBg),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, VirtualGlassBorder)
                 ) {
-                    Column(modifier = Modifier.padding(20.dp)) {
+                    Column(modifier = Modifier.padding(22.dp)) {
                         Text(
-                            text = "Camera Status",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = VirtualTextSecondary
+                            text = "CAMERA STATUS",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = VirtualGoldAccent,
+                            letterSpacing = 1.sp
                         )
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Surface(
@@ -157,7 +194,7 @@ fun CameraDashboardScreen(
                                 }
                             ) {}
 
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
 
                             Text(
                                 text = when {
@@ -170,7 +207,7 @@ fun CameraDashboardScreen(
                                 color = when {
                                     isConflictBusy -> VirtualWarningAmber
                                     isStreaming -> VirtualOnlineGreen
-                                    else -> VirtualTextPrimary
+                                    else -> VirtualTextWhiteHigh
                                 }
                             )
                         }
@@ -178,21 +215,22 @@ fun CameraDashboardScreen(
                         if (isConflictBusy) {
                             Spacer(modifier = Modifier.height(12.dp))
                             Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = VirtualWarningAmber.copy(alpha = 0.12f)
+                                shape = RoundedCornerShape(10.dp),
+                                color = VirtualWarningAmber.copy(alpha = 0.15f),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, VirtualWarningAmber.copy(alpha = 0.3f))
                             ) {
                                 Text(
                                     text = "Another application is currently using the camera.\nVIRTUAL will resume automatically when released.",
                                     fontSize = 12.sp,
-                                    color = VirtualTextPrimary,
-                                    modifier = Modifier.padding(10.dp),
+                                    color = VirtualTextWhiteHigh,
+                                    modifier = Modifier.padding(12.dp),
                                     lineHeight = 16.sp
                                 )
                             }
                         }
 
                         Spacer(modifier = Modifier.height(20.dp))
-                        HorizontalDivider(color = VirtualBorder)
+                        HorizontalDivider(color = VirtualGlassBorder)
                         Spacer(modifier = Modifier.height(16.dp))
 
                         // Device Telemetry
@@ -202,19 +240,19 @@ fun CameraDashboardScreen(
                         ) {
                             Column {
                                 Text("Battery", fontSize = 12.sp, color = VirtualTextMuted)
-                                Text("$batteryLevel%", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = VirtualTextPrimary)
+                                Text("$batteryLevel%", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = VirtualTextWhiteHigh)
                             }
                             Column {
                                 Text("Network", fontSize = 12.sp, color = VirtualTextMuted)
-                                Text(networkType, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = VirtualTextPrimary)
+                                Text(networkType, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = VirtualTextWhiteHigh)
                             }
                             Column {
                                 Text("Quality", fontSize = 12.sp, color = VirtualTextMuted)
-                                Text(quality, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = VirtualTextPrimary)
+                                Text(quality, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = VirtualTextWhiteHigh)
                             }
                             Column {
                                 Text("FPS", fontSize = 12.sp, color = VirtualTextMuted)
-                                Text("30", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = VirtualTextPrimary)
+                                Text("30", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = VirtualTextWhiteHigh)
                             }
                         }
                     }
@@ -225,23 +263,27 @@ fun CameraDashboardScreen(
                 // Screen Off & Multitasking Guidance Note
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = VirtualBlueSubtle)
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = VirtualGlassBg),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, VirtualCyanGlow.copy(alpha = 0.3f))
                 ) {
                     Row(
-                        modifier = Modifier.padding(14.dp),
+                        modifier = Modifier.padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("💡", fontSize = 20.sp)
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("💡", fontSize = 22.sp)
+                        Spacer(modifier = Modifier.width(14.dp))
                         Text(
                             text = "Streaming runs via Android Foreground Service. You can lock your screen or switch to text apps like WhatsApp; the camera feed remains active.",
                             fontSize = 12.sp,
-                            color = VirtualBluePrimary,
-                            lineHeight = 16.sp
+                            color = VirtualCyanGlow,
+                            lineHeight = 16.sp,
+                            fontWeight = FontWeight.Medium
                         )
                     }
                 }
+
+                Spacer(modifier = Modifier.height(30.dp))
             }
 
             // Bottom Streaming Action Button
@@ -249,17 +291,20 @@ fun CameraDashboardScreen(
                 onClick = { toggleStreaming() },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(54.dp)
-                    .padding(bottom = 8.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isStreaming) VirtualOfflineRed else VirtualBluePrimary
-                )
+                    .height(56.dp)
+                    .background(
+                        if (isStreaming) androidx.compose.ui.graphics.Brush.horizontalGradient(
+                            listOf(Color(0xFFEF4444), Color(0xFFB91C1C))
+                        ) else PremiumButtonGradient,
+                        shape = RoundedCornerShape(14.dp)
+                    ),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent)
             ) {
                 Text(
                     text = if (isStreaming) "Stop Streaming" else "Start Streaming",
                     fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Bold,
                     color = VirtualWhite
                 )
             }

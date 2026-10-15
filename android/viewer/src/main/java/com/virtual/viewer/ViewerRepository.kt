@@ -8,7 +8,7 @@ import kotlinx.coroutines.withContext
 
 class ViewerRepository(private val context: Context) {
 
-    private val api = ApiClient.getService(context)
+    private val api: com.virtual.core.network.ApiService get() = ApiClient.getService(context)
 
     suspend fun getPairedCameras(): Result<List<Device>> = withContext(Dispatchers.IO) {
         try {

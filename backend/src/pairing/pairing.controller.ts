@@ -5,15 +5,13 @@ import { AuthenticatedRequest } from '../middleware/auth';
 import { signalingServer } from '../signaling/signaling.server';
 
 const createPairingSchema = z.object({
-  cameraDeviceId: z.string().uuid('Valid camera device ID is required')
+  cameraDeviceId: z.string().min(1, 'Camera device ID is required')
 });
 
 const joinPairingSchema = z.object({
-  viewerDeviceId: z.string().uuid('Valid viewer device ID is required'),
+  viewerDeviceId: z.string().min(1, 'Viewer device ID is required'),
   pairingToken: z.string().optional(),
   pairingCode: z.string().optional()
-}).refine(data => data.pairingToken || data.pairingCode, {
-  message: 'Either pairingToken or pairingCode must be provided'
 });
 
 export class PairingController {

@@ -14,7 +14,7 @@ import kotlinx.coroutines.withContext
 
 class SettingsRepository(private val context: Context) {
 
-    private val api = ApiClient.getService(context)
+    private val api: com.virtual.core.network.ApiService get() = ApiClient.getService(context)
     private val storage = SecureStorageManager.getInstance(context)
 
     suspend fun getSettings(): Result<DeviceSetting> = withContext(Dispatchers.IO) {

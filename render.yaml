@@ -14,7 +14,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        value: postgresql://neondb_owner:npg_d3FfThjcvaz2@ep-royal-wave-b491ugdv-pooler.c-6.us-east-2.aws.neon.tech/neondb?sslmode=require
+        value: postgresql://neondb_owner:npg_d3FfThjcvaz2@ep-royal-wave-b491ugdv-pooler.c-6.us-east-2.aws.neon.tech/neondb?sslmode=require&connection_limit=20&pool_timeout=30&connect_timeout=30
       - key: JWT_SECRET
         generateValue: true
       - key: REFRESH_TOKEN_SECRET

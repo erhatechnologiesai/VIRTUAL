@@ -17,13 +17,15 @@ interface WebRtcEvents {
 
 class WebRtcManager(
     private val context: Context,
-    private val events: WebRtcEvents
+    private val events: WebRtcEvents,
+    customEglBase: EglBase? = null
 ) {
     private val TAG = "VirtualWebRTC"
 
-    val eglBase: EglBase = EglBase.create()
+    val eglBase: EglBase = customEglBase ?: EglBase.create()
     private var peerConnectionFactory: PeerConnectionFactory? = null
     private var peerConnection: PeerConnection? = null
+    private val queuedCandidates = mutableListOf<IceCandidate>()
 
     private var localVideoSource: VideoSource? = null
     private var localVideoTrack: VideoTrack? = null
@@ -31,7 +33,12 @@ class WebRtcManager(
     private var localAudioTrack: AudioTrack? = null
 
     private var iceServers: List<PeerConnection.IceServer> = listOf(
-        PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer()
+        PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer(),
+        PeerConnection.IceServer.builder("stun:stun1.l.google.com:19302").createIceServer(),
+        PeerConnection.IceServer.builder("stun:stun2.l.google.com:19302").createIceServer(),
+        PeerConnection.IceServer.builder("stun:stun3.l.google.com:19302").createIceServer(),
+        PeerConnection.IceServer.builder("stun:stun4.l.google.com:19302").createIceServer(),
+        PeerConnection.IceServer.builder("stun:stun.cloudflare.com:3478").createIceServer()
     )
 
     init {
@@ -212,17 +219,63 @@ class WebRtcManager(
         }, mediaConstraints)
     }
 
-    fun setRemoteDescription(sdp: SessionDescription, onComplete: () -> Unit = {}) {
+    fun resetPeerConnectionForNewSession(): PeerConnection? {
+        try {
+            Log.d(TAG, "Resetting PeerConnection for new session / reconnect")
+            peerConnection?.dispose()
+            peerConnection = null
+            synchronized(queuedCandidates) {
+                queuedCandidates.clear()
+            }
+            createPeerConnection()
+            // Re-attach existing video & audio tracks to new peer connection
+            localVideoTrack?.let {
+                peerConnection?.addTrack(it, listOf("VIRTUAL_STREAM"))
+                Log.d(TAG, "Re-attached local video track to fresh peer connection")
+            }
+            localAudioTrack?.let {
+                peerConnection?.addTrack(it, listOf("VIRTUAL_STREAM"))
+                Log.d(TAG, "Re-attached local audio track to fresh peer connection")
+            }
+            return peerConnection
+        } catch (e: Exception) {
+            Log.e(TAG, "Error resetting PeerConnection: ${e.message}")
+            return null
+        }
+    }
+
+    fun setRemoteDescription(sdp: SessionDescription, onComplete: () -> Unit = {}, onError: (String) -> Unit = {}) {
         peerConnection?.setRemoteDescription(object : SdpObserverAdapter("setRemoteDescription") {
             override fun onSetSuccess() {
                 Log.d(TAG, "Remote description set successfully: ${sdp.type}")
+                synchronized(queuedCandidates) {
+                    if (queuedCandidates.isNotEmpty()) {
+                        Log.d(TAG, "Draining ${queuedCandidates.size} queued ICE candidates")
+                        for (cand in queuedCandidates) {
+                            peerConnection?.addIceCandidate(cand)
+                        }
+                        queuedCandidates.clear()
+                    }
+                }
                 onComplete()
+            }
+
+            override fun onSetFailure(error: String?) {
+                Log.e(TAG, "setRemoteDescription FAILED: $error")
+                onError(error ?: "Unknown error setting remote description")
             }
         }, sdp)
     }
 
     fun addIceCandidate(candidate: IceCandidate) {
-        peerConnection?.addIceCandidate(candidate)
+        if (peerConnection?.remoteDescription != null) {
+            peerConnection?.addIceCandidate(candidate)
+        } else {
+            synchronized(queuedCandidates) {
+                queuedCandidates.add(candidate)
+            }
+            Log.d(TAG, "Queued ICE candidate waiting for remote description: ${candidate.sdpMid}")
+        }
     }
 
     fun close() {

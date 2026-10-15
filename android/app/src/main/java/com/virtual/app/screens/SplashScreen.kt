@@ -22,21 +22,17 @@ fun SplashScreen(
     onNavigate: (String) -> Unit
 ) {
     LaunchedEffect(Unit) {
-        delay(1200) // Brief branded splash
-        if (storage.isLoggedIn()) {
-            when (storage.deviceRole) {
-                DeviceType.CAMERA -> onNavigate(Screen.CameraDashboard.route)
-                DeviceType.VIEWER -> {
-                    if (storage.isPaired) {
-                        onNavigate(Screen.ViewerDashboard.route)
-                    } else {
-                        onNavigate(Screen.ViewerAddCamera.route)
-                    }
+        delay(1000) // Brief branded splash
+        when (storage.deviceRole) {
+            DeviceType.CAMERA -> onNavigate(Screen.CameraDashboard.route)
+            DeviceType.VIEWER -> {
+                if (storage.isPaired) {
+                    onNavigate(Screen.ViewerDashboard.route)
+                } else {
+                    onNavigate(Screen.ViewerAddCamera.route)
                 }
-                null -> onNavigate(Screen.DeviceRole.route)
             }
-        } else {
-            onNavigate(Screen.Welcome.route)
+            null -> onNavigate(Screen.DeviceRole.route)
         }
     }
 

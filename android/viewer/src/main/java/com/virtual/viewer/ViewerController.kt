@@ -22,6 +22,7 @@ class ViewerController(
 ) : SignalingListener, WebRtcEvents {
 
     private val TAG = "VirtualViewerController"
+    val eglBase: EglBase = EglBase.create()
     private val storage = SecureStorageManager.getInstance(context)
     private var signalingClient: WebRtcSignalingClient? = null
     private var webRtcManager: WebRtcManager? = null
@@ -39,15 +40,17 @@ class ViewerController(
         Log.i(TAG, "Initiating WebRTC connection to Camera [$cameraId]")
         callbacks.onConnectionStateChanged("CONNECTING")
 
+        // 1. Initialize WebRTC Manager synchronously with shared eglBase
+        webRtcManager?.close()
+        webRtcManager = WebRtcManager(context, this@ViewerController, eglBase)
+        webRtcManager?.createPeerConnection()
+
         controllerScope.launch {
-            // 1. Fetch dynamic STUN/TURN ICE servers from backend
+            // 2. Fetch dynamic STUN/TURN ICE servers from backend
             fetchIceServers()
 
-            // 2. Initialize WebRTC Manager
-            webRtcManager = WebRtcManager(context, this@ViewerController)
-            webRtcManager?.createPeerConnection()
-
             // 3. Connect Signaling
+            signalingClient?.disconnect()
             signalingClient = WebRtcSignalingClient(storage, this@ViewerController)
             signalingClient?.connect()
 
@@ -75,6 +78,7 @@ class ViewerController(
                     val servers = data.iceServers
                     webRtcManager?.setIceServers(servers)
                 }
+                Unit
             } catch (e: Exception) {
                 Log.w(TAG, "Using default STUN server: ${e.message}")
             }
@@ -83,20 +87,22 @@ class ViewerController(
 
     fun toggleAudio(): Boolean {
         isAudioMuted = !isAudioMuted
-        // Mute remote audio track
         return isAudioMuted
     }
 
     fun reconnect() {
         Log.i(TAG, "Manual reconnect triggered")
         val cam = targetCameraId ?: return
-        disconnect()
+        callbacks.onConnectionStateChanged("RECONNECTING")
+        disconnect(isReconnecting = true)
         connectToCamera(cam)
     }
 
-    fun disconnect() {
-        Log.i(TAG, "Disconnecting ViewerController...")
-        callbacks.onConnectionStateChanged("DISCONNECTED")
+    fun disconnect(isReconnecting: Boolean = false) {
+        Log.i(TAG, "Disconnecting ViewerController (isReconnecting=$isReconnecting)...")
+        if (!isReconnecting) {
+            callbacks.onConnectionStateChanged("DISCONNECTED")
+        }
 
         // End session in backend
         sessionId?.let { sid ->
@@ -126,7 +132,9 @@ class ViewerController(
     }
 
     override fun onDisconnected() {
-        callbacks.onConnectionStateChanged("DISCONNECTED")
+        if (!isConnected) {
+            callbacks.onConnectionStateChanged("DISCONNECTED")
+        }
     }
 
     override fun onOfferReceived(fromDeviceId: String, sdp: String, sessionId: String?) {}
@@ -134,10 +142,13 @@ class ViewerController(
     override fun onAnswerReceived(fromDeviceId: String, sdp: String, sessionId: String?) {
         Log.i(TAG, "WebRTC Answer received from Camera [$fromDeviceId]")
         val answer = SessionDescription(SessionDescription.Type.ANSWER, sdp)
-        webRtcManager?.setRemoteDescription(answer) {
+        webRtcManager?.setRemoteDescription(answer, onComplete = {
+            Log.i(TAG, "Remote answer set successfully. Viewer is connected!")
             callbacks.onConnectionStateChanged("CONNECTED")
             isConnected = true
-        }
+        }, onError = { err ->
+            Log.e(TAG, "Failed to set remote answer: $err")
+        })
     }
 
     override fun onIceCandidateReceived(fromDeviceId: String, sdpMid: String, sdpMLineIndex: Int, candidate: String) {
@@ -171,7 +182,16 @@ class ViewerController(
     override fun onLocalDescriptionGenerated(sdp: SessionDescription) {
         targetCameraId?.let { camId ->
             if (sdp.type == SessionDescription.Type.OFFER) {
+                Log.i(TAG, "Generated SDP Offer, transmitting to camera [$camId]")
                 signalingClient?.sendOffer(camId, sdp.description, sessionId)
+                // Offer watchdog: if still not connected after 3.5s, re-send the offer
+                controllerScope.launch {
+                    delay(3500)
+                    if (!isConnected && signalingClient != null) {
+                        Log.w(TAG, "Watchdog: Re-transmitting SDP offer to camera [$camId]...")
+                        signalingClient?.sendOffer(camId, sdp.description, sessionId)
+                    }
+                }
             }
         }
     }

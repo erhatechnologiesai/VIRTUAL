@@ -42,11 +42,12 @@ export class DevicesService {
     });
 
     if (device) {
-      // Update existing device
+      // Update existing device and ensure cameraDetail exists if role is CAMERA
       device = await prisma.device.update({
         where: { id: device.id },
         data: {
           deviceName: defaultName,
+          deviceType: data.deviceType,
           appVersion: data.appVersion || device.appVersion,
           status: 'ONLINE',
           lastSeen: new Date(),
@@ -54,8 +55,28 @@ export class DevicesService {
         },
         include: { cameraDetail: true, settings: true }
       });
-      logger.info(`Existing device re-registered: ${device.deviceUuid}`);
-      return device;
+
+      if (data.deviceType === 'CAMERA' && !device.cameraDetail) {
+        await prisma.cameraDevice.create({
+          data: {
+            deviceId: device.id,
+            cameraType: 'BACK',
+            resolution: '720p',
+            fps: 30,
+            audioEnabled: false,
+            streamStatus: 'IDLE',
+            batteryLevel: 100,
+            networkType: 'WIFI'
+          }
+        });
+        device = await prisma.device.findUnique({
+          where: { id: device.id },
+          include: { cameraDetail: true, settings: true }
+        }) as any;
+      }
+
+      logger.info(`Existing device re-registered: ${device!.deviceUuid} (${device!.deviceType})`);
+      return device!;
     }
 
     // Create new device transactionally with settings and cameraDetail if CAMERA

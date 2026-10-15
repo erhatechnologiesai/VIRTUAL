@@ -3,6 +3,7 @@ package com.virtual.app.screens
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -10,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -73,6 +75,9 @@ fun LiveViewScreen(
 
     DisposableEffect(Unit) {
         onDispose {
+            try {
+                rendererRef?.release()
+            } catch (e: Exception) {}
             viewerController.disconnect()
         }
     }
@@ -86,6 +91,11 @@ fun LiveViewScreen(
         AndroidView(
             factory = { ctx ->
                 SurfaceViewRenderer(ctx).apply {
+                    try {
+                        init(viewerController.eglBase.eglBaseContext, null)
+                    } catch (e: Exception) {
+                        android.util.Log.e("LiveViewScreen", "SurfaceViewRenderer init error: ${e.message}")
+                    }
                     setEnableHardwareScaler(true)
                     setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT)
                     layoutParams = FrameLayout.LayoutParams(
@@ -93,6 +103,14 @@ fun LiveViewScreen(
                         ViewGroup.LayoutParams.MATCH_PARENT
                     )
                     rendererRef = this
+                    remoteVideoTrack?.let { track ->
+                        try { track.addSink(this) } catch (e: Exception) {}
+                    }
+                }
+            },
+            update = { renderer ->
+                remoteVideoTrack?.let { track ->
+                    try { track.addSink(renderer) } catch (e: Exception) {}
                 }
             },
             modifier = Modifier.fillMaxSize()
@@ -149,7 +167,8 @@ fun LiveViewScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 16.dp, start = 16.dp, end = 16.dp)
-                    .align(Alignment.TopCenter),
+                    .align(Alignment.TopCenter)
+                    .zIndex(30f),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -175,11 +194,18 @@ fun LiveViewScreen(
                 }
 
                 Surface(
-                    shape = CircleShape,
-                    color = Color.Black.copy(alpha = 0.6f)
+                    shape = RoundedCornerShape(10.dp),
+                    color = Color.Black.copy(alpha = 0.7f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.3f)),
+                    modifier = Modifier.clickable { onNavigateSettings() }
                 ) {
-                    IconButton(onClick = onNavigateSettings) {
-                        Text("⚙", color = VirtualWhite, fontSize = 18.sp)
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("⚙️", fontSize = 16.sp)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Settings", color = VirtualWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -190,7 +216,8 @@ fun LiveViewScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
-                .align(Alignment.BottomCenter),
+                .align(Alignment.BottomCenter)
+                .zIndex(30f),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = VirtualWhite.copy(alpha = 0.95f)),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
@@ -231,25 +258,31 @@ fun LiveViewScreen(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     OutlinedButton(
                         onClick = { isFullScreen = !isFullScreen },
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text(if (isFullScreen) "Exit Full" else "⛶ Full Screen", fontSize = 13.sp)
+                        Text(if (isFullScreen) "Exit" else "⛶ Full", fontSize = 12.sp)
                     }
 
-                    Spacer(modifier = Modifier.width(12.dp))
+                    OutlinedButton(
+                        onClick = onNavigateSettings,
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.weight(1.2f)
+                    ) {
+                        Text("⚙️ Settings", fontSize = 12.sp)
+                    }
 
                     Button(
                         onClick = { viewerController.reconnect() },
                         shape = RoundedCornerShape(8.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = VirtualBluePrimary),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1.3f)
                     ) {
-                        Text("↻ Reconnect", fontSize = 13.sp, color = VirtualWhite)
+                        Text("↻ Reconnect", fontSize = 12.sp, color = VirtualWhite)
                     }
                 }
             }

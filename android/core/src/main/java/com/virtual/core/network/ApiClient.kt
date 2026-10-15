@@ -10,19 +10,26 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object ApiClient {
-    // Default emulator or local IP; configurable at runtime
-    var baseUrl: String = "http://10.0.2.2:4000/"
+    // Default Backend URL: Local Wi-Fi IP or Cloudflare Tunnel
+    var baseUrl: String = "http://192.168.18.20:4000/"
 
     private var retrofit: Retrofit? = null
     private var apiService: ApiService? = null
+    private var currentActiveUrl: String? = null
 
     fun getService(context: Context): ApiService {
-        if (apiService == null) {
-            val storage = SecureStorageManager.getInstance(context)
+        val storage = SecureStorageManager.getInstance(context)
+        var activeUrl = (storage.customBaseUrl ?: baseUrl).trim()
+        if (!activeUrl.endsWith("/")) {
+            activeUrl += "/"
+        }
 
+        if (apiService == null || currentActiveUrl != activeUrl) {
+            currentActiveUrl = activeUrl
             val authInterceptor = Interceptor { chain ->
                 val original = chain.request()
                 val requestBuilder = original.newBuilder()
+                    .addHeader("bypass-tunnel-reminder", "true")
 
                 // Attach JWT Access Token
                 storage.accessToken?.let { token ->
@@ -51,7 +58,7 @@ object ApiClient {
                 .build()
 
             retrofit = Retrofit.Builder()
-                .baseUrl(baseUrl)
+                .baseUrl(activeUrl)
                 .client(okHttpClient)
                 .addConverterFactory(GsonConverterFactory.create())
                 .build()
@@ -67,6 +74,8 @@ object ApiClient {
             formatted += "/"
         }
         baseUrl = formatted
+        val storage = SecureStorageManager.getInstance(context)
+        storage.customBaseUrl = formatted
         apiService = null
         return getService(context)
     }

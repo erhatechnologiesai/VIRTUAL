@@ -31,8 +31,13 @@ class WebRtcSignalingClient(
     private val coroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     fun connect() {
-        val token = storage.accessToken ?: return
-        val deviceId = storage.deviceId ?: return
+        val token = storage.accessToken ?: "guest_access_token"
+        val deviceId = storage.deviceId ?: run {
+            val prefix = if (storage.deviceRole == com.virtual.core.models.DeviceType.CAMERA) "VRT-CAM-" else "VRT-VIE-"
+            val tempId = "$prefix${java.util.UUID.randomUUID().toString().replace("-", "").take(8).uppercase()}"
+            storage.deviceId = tempId
+            tempId
+        }
 
         isManualDisconnect = false
 
@@ -49,8 +54,9 @@ class WebRtcSignalingClient(
                 timeout = 20000
             }
 
-            // Derive socket server URL from ApiClient baseUrl
-            val serverUri = ApiClient.baseUrl.removeSuffix("/")
+            // Derive socket server URL from storage customBaseUrl or ApiClient baseUrl
+            val activeBase = storage.customBaseUrl ?: ApiClient.baseUrl
+            val serverUri = activeBase.trim().removeSuffix("/")
             socket = IO.socket(serverUri, options)
 
             setupSocketListeners()
@@ -65,8 +71,15 @@ class WebRtcSignalingClient(
     private fun setupSocketListeners() {
         socket?.apply {
             on(Socket.EVENT_CONNECT) {
-                Log.d(TAG, "Signaling connected successfully")
+                Log.d(TAG, "Signaling connected successfully for device ${storage.deviceId}")
                 reconnectAttempt = 0
+                try {
+                    val regObj = JSONObject().apply {
+                        put("deviceId", storage.deviceId ?: "local_cam_1")
+                        put("deviceType", storage.deviceRole?.name ?: "CAMERA")
+                    }
+                    emit("register_device", regObj)
+                } catch (e: Exception) {}
                 listener.onConnected()
             }
 
@@ -88,11 +101,20 @@ class WebRtcSignalingClient(
             on("webrtc_offer") { args ->
                 try {
                     val data = args[0] as JSONObject
-                    val fromDeviceId = data.getString("fromDeviceId")
-                    val sdpObj = data.getJSONObject("sdp")
-                    val sdp = sdpObj.getString("description")
+                    val fromDeviceId = data.optString("fromDeviceId")
+                    if (fromDeviceId == storage.deviceId) return@on
+
+                    val sdp = if (data.optJSONObject("sdp") != null) {
+                        val sdpObj = data.getJSONObject("sdp")
+                        sdpObj.optString("description", sdpObj.optString("sdp", ""))
+                    } else {
+                        data.optString("sdp")
+                    }
                     val sessionId = data.optString("sessionId", null)
-                    listener.onOfferReceived(fromDeviceId, sdp, sessionId)
+                    if (sdp.isNotBlank()) {
+                        Log.d(TAG, "Received valid SDP offer from [$fromDeviceId]")
+                        listener.onOfferReceived(fromDeviceId, sdp, sessionId)
+                    }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error parsing webrtc_offer: ${e.message}")
                 }
@@ -101,11 +123,20 @@ class WebRtcSignalingClient(
             on("webrtc_answer") { args ->
                 try {
                     val data = args[0] as JSONObject
-                    val fromDeviceId = data.getString("fromDeviceId")
-                    val sdpObj = data.getJSONObject("sdp")
-                    val sdp = sdpObj.getString("description")
+                    val fromDeviceId = data.optString("fromDeviceId")
+                    if (fromDeviceId == storage.deviceId) return@on
+
+                    val sdp = if (data.optJSONObject("sdp") != null) {
+                        val sdpObj = data.getJSONObject("sdp")
+                        sdpObj.optString("description", sdpObj.optString("sdp", ""))
+                    } else {
+                        data.optString("sdp")
+                    }
                     val sessionId = data.optString("sessionId", null)
-                    listener.onAnswerReceived(fromDeviceId, sdp, sessionId)
+                    if (sdp.isNotBlank()) {
+                        Log.d(TAG, "Received valid SDP answer from [$fromDeviceId]")
+                        listener.onAnswerReceived(fromDeviceId, sdp, sessionId)
+                    }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error parsing webrtc_answer: ${e.message}")
                 }
@@ -114,12 +145,16 @@ class WebRtcSignalingClient(
             on("ice_candidate") { args ->
                 try {
                     val data = args[0] as JSONObject
-                    val fromDeviceId = data.getString("fromDeviceId")
-                    val candObj = data.getJSONObject("candidate")
-                    val sdpMid = candObj.getString("sdpMid")
-                    val sdpMLineIndex = candObj.getInt("sdpMLineIndex")
-                    val candidate = candObj.getString("candidate")
-                    listener.onIceCandidateReceived(fromDeviceId, sdpMid, sdpMLineIndex, candidate)
+                    val fromDeviceId = data.optString("fromDeviceId")
+                    if (fromDeviceId == storage.deviceId) return@on
+
+                    val candObj = data.optJSONObject("candidate") ?: return@on
+                    val sdpMid = candObj.optString("sdpMid", "")
+                    val sdpMLineIndex = candObj.optInt("sdpMLineIndex", 0)
+                    val candidate = candObj.optString("candidate", "")
+                    if (candidate.isNotEmpty()) {
+                        listener.onIceCandidateReceived(fromDeviceId, sdpMid, sdpMLineIndex, candidate)
+                    }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error parsing ice_candidate: ${e.message}")
                 }
@@ -170,6 +205,7 @@ class WebRtcSignalingClient(
 
     fun sendOffer(targetDeviceId: String, sdp: String, sessionId: String? = null) {
         val payload = JSONObject().apply {
+            put("fromDeviceId", storage.deviceId ?: "")
             put("targetDeviceId", targetDeviceId)
             put("sessionId", sessionId)
             put("sdp", JSONObject().apply {
@@ -183,6 +219,7 @@ class WebRtcSignalingClient(
 
     fun sendAnswer(targetDeviceId: String, sdp: String, sessionId: String? = null) {
         val payload = JSONObject().apply {
+            put("fromDeviceId", storage.deviceId ?: "")
             put("targetDeviceId", targetDeviceId)
             put("sessionId", sessionId)
             put("sdp", JSONObject().apply {
@@ -196,6 +233,7 @@ class WebRtcSignalingClient(
 
     fun sendIceCandidate(targetDeviceId: String, sdpMid: String, sdpMLineIndex: Int, candidate: String) {
         val payload = JSONObject().apply {
+            put("fromDeviceId", storage.deviceId ?: "")
             put("targetDeviceId", targetDeviceId)
             put("candidate", JSONObject().apply {
                 put("sdpMid", sdpMid)

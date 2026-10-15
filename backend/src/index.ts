@@ -30,6 +30,11 @@ async function bootstrap() {
       logger.info(`  Signaling WebSocket: READY                          `);
       logger.info(`  Health check: http://localhost:${config.port}/health `);
       logger.info(`=======================================================`);
+
+      // Keep-alive pinger to prevent tunnel activity timeout
+      setInterval(() => {
+        http.get(`http://127.0.0.1:${config.port}/health`, () => {}).on('error', () => {});
+      }, 10000);
     });
 
     // Graceful Shutdown

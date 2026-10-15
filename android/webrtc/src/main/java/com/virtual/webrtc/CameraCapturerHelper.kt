@@ -7,7 +7,11 @@ import org.webrtc.*
 object CameraCapturerHelper {
     private const val TAG = "CameraCapturerHelper"
 
-    fun createCameraCapturer(context: Context, isFrontFacing: Boolean = false): VideoCapturer? {
+    fun createCameraCapturer(
+        context: Context,
+        isFrontFacing: Boolean = false,
+        eventsHandler: CameraVideoCapturer.CameraEventsHandler? = null
+    ): VideoCapturer? {
         val enumerator = if (Camera2Enumerator.isSupported(context)) {
             Log.d(TAG, "Using Camera2Enumerator")
             Camera2Enumerator(context)
@@ -22,19 +26,19 @@ object CameraCapturerHelper {
         for (deviceName in deviceNames) {
             if (isFrontFacing && enumerator.isFrontFacing(deviceName)) {
                 Log.d(TAG, "Found Front Camera: $deviceName")
-                val capturer = enumerator.createCapturer(deviceName, null)
+                val capturer = enumerator.createCapturer(deviceName, eventsHandler)
                 if (capturer != null) return capturer
             }
             if (!isFrontFacing && enumerator.isBackFacing(deviceName)) {
                 Log.d(TAG, "Found Back Camera: $deviceName")
-                val capturer = enumerator.createCapturer(deviceName, null)
+                val capturer = enumerator.createCapturer(deviceName, eventsHandler)
                 if (capturer != null) return capturer
             }
         }
 
         // 2. Fallback to any available camera device
         for (deviceName in deviceNames) {
-            val capturer = enumerator.createCapturer(deviceName, null)
+            val capturer = enumerator.createCapturer(deviceName, eventsHandler)
             if (capturer != null) {
                 Log.d(TAG, "Using fallback camera: $deviceName")
                 return capturer

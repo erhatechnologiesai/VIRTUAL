@@ -8,22 +8,36 @@ import com.virtual.core.network.ApiClient
 import com.virtual.core.storage.SecureStorageManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.util.UUID
 
 class AuthRepository(private val context: Context) {
 
-    private val api = ApiClient.getService(context)
+    private val api: com.virtual.core.network.ApiService get() = ApiClient.getService(context)
     private val storage = SecureStorageManager.getInstance(context)
+
+    private fun sanitizeEmail(email: String): String {
+        var clean = email.trim().lowercase()
+        if (clean.isBlank()) clean = "user@virtual.app"
+        if (!clean.contains("@")) clean = "$clean@virtual.app"
+        if (clean.endsWith(".cor") || clean.endsWith(".con") || clean.endsWith(".cm")) {
+            clean = clean.substringBeforeLast(".") + ".com"
+        }
+        return clean
+    }
 
     suspend fun register(name: String, email: String, pass: String): Result<AuthResponse> = withContext(Dispatchers.IO) {
         try {
-            val response = api.register(mapOf("name" to name, "email" to email, "password" to pass))
+            val cleanEmail = sanitizeEmail(email)
+            val cleanPass = pass.trim()
+            val cleanName = name.trim()
+            val response = api.register(mapOf("name" to cleanName, "email" to cleanEmail, "password" to cleanPass))
             val data = response.body()?.data
             if (response.isSuccessful && data != null) {
                 saveAuthData(data)
                 Result.success(data)
             } else {
-                val errorMsg = response.body()?.error ?: "Registration failed"
+                val errorMsg = extractErrorMessage(response, "Registration failed")
                 Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
@@ -33,13 +47,15 @@ class AuthRepository(private val context: Context) {
 
     suspend fun login(email: String, pass: String): Result<AuthResponse> = withContext(Dispatchers.IO) {
         try {
-            val response = api.login(mapOf("email" to email, "password" to pass))
+            val cleanEmail = sanitizeEmail(email)
+            val cleanPass = pass.trim()
+            val response = api.login(mapOf("email" to cleanEmail, "password" to cleanPass))
             val data = response.body()?.data
             if (response.isSuccessful && data != null) {
                 saveAuthData(data)
                 Result.success(data)
             } else {
-                val errorMsg = response.body()?.error ?: "Invalid email or password"
+                val errorMsg = extractErrorMessage(response, "Invalid email or password")
                 Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
@@ -69,7 +85,8 @@ class AuthRepository(private val context: Context) {
                 storage.deviceRole = role
                 Result.success(device)
             } else {
-                Result.failure(Exception(response.body()?.error ?: "Failed to register device"))
+                val errorMsg = extractErrorMessage(response, "Failed to register device")
+                Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -86,5 +103,31 @@ class AuthRepository(private val context: Context) {
         storage.userId = authResponse.user.id
         storage.userEmail = authResponse.user.email
         storage.userName = authResponse.user.name
+    }
+
+    private fun extractErrorMessage(response: retrofit2.Response<*>, defaultMsg: String): String {
+        return try {
+            val errorJson = response.errorBody()?.string()
+            if (!errorJson.isNullOrBlank()) {
+                val jsonObject = JSONObject(errorJson)
+                if (jsonObject.has("error")) {
+                    jsonObject.getString("error")
+                } else if (jsonObject.has("errors")) {
+                    val array = jsonObject.getJSONArray("errors")
+                    if (array.length() > 0) {
+                        val firstObj = array.getJSONObject(0)
+                        firstObj.optString("message", defaultMsg)
+                    } else {
+                        defaultMsg
+                    }
+                } else {
+                    defaultMsg
+                }
+            } else {
+                defaultMsg
+            }
+        } catch (e: Exception) {
+            defaultMsg
+        }
     }
 }

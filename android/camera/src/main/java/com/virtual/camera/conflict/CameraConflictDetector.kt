@@ -21,10 +21,12 @@ class CameraConflictDetector(
     private var isStreamingActive = false
     private var activeCameraId: String? = null
 
+    @Volatile var isSelfCapturing: Boolean = false
+
     private val availabilityCallback = object : CameraManager.AvailabilityCallback() {
         override fun onCameraAvailable(cameraId: String) {
             super.onCameraAvailable(cameraId)
-            Log.d(TAG, "Hardware Camera available: $cameraId")
+            Log.d(TAG, "Hardware Camera available: $cameraId (isSelfCapturing=$isSelfCapturing)")
             if (isStreamingActive && cameraId == activeCameraId) {
                 mainHandler.post {
                     listener.onCameraAvailableAgain(cameraId)
@@ -34,8 +36,11 @@ class CameraConflictDetector(
 
         override fun onCameraUnavailable(cameraId: String) {
             super.onCameraUnavailable(cameraId)
-            Log.w(TAG, "Hardware Camera unavailable (possibly in use by another app): $cameraId")
-            if (isStreamingActive && cameraId == activeCameraId) {
+            Log.d(TAG, "Hardware Camera unavailable callback: $cameraId (isSelfCapturing=$isSelfCapturing)")
+            // When VIRTUAL itself opens the camera, Android OS marks it unavailable to third-party apps.
+            // This is expected and must NOT be treated as a conflict.
+            if (isStreamingActive && cameraId == activeCameraId && !isSelfCapturing) {
+                Log.w(TAG, "External conflict: Camera $cameraId acquired by third-party app!")
                 mainHandler.post {
                     listener.onCameraConflictDetected(cameraId)
                 }

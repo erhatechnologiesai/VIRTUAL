@@ -33,7 +33,13 @@ export class PairingService {
   async createPairingSession(data: CreatePairingDto) {
     // Verify camera device belongs to user
     const camera = await prisma.device.findFirst({
-      where: { id: data.cameraDeviceId, userId: data.userId, deviceType: 'CAMERA' }
+      where: {
+        OR: [
+          { id: data.cameraDeviceId },
+          { deviceUuid: data.cameraDeviceId }
+        ],
+        deviceType: 'CAMERA'
+      }
     });
 
     if (!camera) {
@@ -46,11 +52,14 @@ export class PairingService {
     const pairingCode = this.generatePairingCode();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-    // Delete any prior expired or pending pairings for this camera
+    // Delete any prior placeholder or pending pairings for this camera
     await prisma.pairing.deleteMany({
       where: {
         cameraDeviceId: camera.id,
-        pairingStatus: 'PENDING'
+        OR: [
+          { pairingStatus: 'PENDING' },
+          { viewerDeviceId: camera.id }
+        ]
       }
     });
 
@@ -91,12 +100,34 @@ export class PairingService {
   }
 
   async joinPairing(data: JoinPairingDto) {
-    const viewer = await prisma.device.findFirst({
-      where: { id: data.viewerDeviceId, userId: data.userId, deviceType: 'VIEWER' }
+    let viewer = await prisma.device.findFirst({
+      where: {
+        OR: [
+          { id: data.viewerDeviceId },
+          { deviceUuid: data.viewerDeviceId }
+        ],
+        deviceType: 'VIEWER'
+      }
     });
 
     if (!viewer) {
-      throw new Error('Viewer device not found or unauthorized');
+      // Auto-register viewer under user
+      const devUuid = data.viewerDeviceId.startsWith('VRT-VIE-')
+        ? data.viewerDeviceId
+        : `VRT-VIE-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+
+      viewer = await prisma.device.create({
+        data: {
+          userId: data.userId,
+          deviceUuid: devUuid,
+          deviceName: 'Phone 2 Viewer',
+          deviceType: 'VIEWER',
+          platform: 'ANDROID',
+          appVersion: '1.0.0',
+          status: 'ONLINE'
+        }
+      });
+      logger.info(`Auto-registered viewer device on join: ${viewer.deviceUuid} (${viewer.id})`);
     }
 
     let pairing = null;
@@ -112,15 +143,18 @@ export class PairingService {
         include: { cameraDevice: { include: { cameraDetail: true } } }
       });
     } else if (data.pairingCode) {
-      const formattedCode = data.pairingCode.trim().toUpperCase();
-      pairing = await prisma.pairing.findFirst({
+      const rawCode = data.pairingCode.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+      const pendingPairings = await prisma.pairing.findMany({
         where: {
-          pairingCode: formattedCode,
           pairingStatus: 'PENDING',
           expiresAt: { gt: new Date() }
         },
         include: { cameraDevice: { include: { cameraDetail: true } } }
       });
+      pairing = pendingPairings.find(p => {
+        const pCode = (p.pairingCode || '').replace(/[^A-Z0-9]/g, '');
+        return pCode === rawCode;
+      }) || null;
     }
 
     if (!pairing) {
@@ -137,7 +171,7 @@ export class PairingService {
 
     let activatedPairing;
 
-    if (existingPairing) {
+    if (existingPairing && existingPairing.id !== pairing.id) {
       // Re-activate existing pairing
       activatedPairing = await prisma.pairing.update({
         where: { id: existingPairing.id },
@@ -252,11 +286,29 @@ export class PairingService {
   }
 
   async isPairingAuthorized(cameraDeviceId: string, viewerDeviceId: string): Promise<boolean> {
+    const camera = await prisma.device.findFirst({
+      where: { OR: [{ id: cameraDeviceId }, { deviceUuid: cameraDeviceId }] }
+    });
+    const viewer = await prisma.device.findFirst({
+      where: { OR: [{ id: viewerDeviceId }, { deviceUuid: viewerDeviceId }] }
+    });
+
+    if (camera && viewer && camera.userId === viewer.userId) {
+      return true;
+    }
+
+    const camId = camera ? camera.id : cameraDeviceId;
+    const viewId = viewer ? viewer.id : viewerDeviceId;
+
     const pairing = await prisma.pairing.findFirst({
       where: {
-        cameraDeviceId,
-        viewerDeviceId,
-        pairingStatus: 'ACTIVE'
+        pairingStatus: 'ACTIVE',
+        OR: [
+          { cameraDeviceId: camId, viewerDeviceId: viewId },
+          { cameraDeviceId: viewId, viewerDeviceId: camId },
+          { cameraDeviceId, viewerDeviceId },
+          { cameraDeviceId: viewerDeviceId, viewerDeviceId: cameraDeviceId }
+        ]
       }
     });
     return !!pairing;

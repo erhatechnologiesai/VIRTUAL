@@ -1,9 +1,11 @@
 package com.virtual.app.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -50,7 +52,7 @@ fun SecurityScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(VirtualWhite)
+            .background(PremiumBackgroundGradient)
             .padding(20.dp)
     ) {
         Column(
@@ -62,15 +64,20 @@ fun SecurityScreen(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = onNavigateBack) {
-                        Text("←", fontSize = 22.sp, color = VirtualTextPrimary)
+                    IconButton(
+                        onClick = onNavigateBack,
+                        modifier = Modifier
+                            .background(VirtualGlassBg, CircleShape)
+                            .border(1.dp, VirtualGlassBorder, CircleShape)
+                    ) {
+                        Text("←", fontSize = 22.sp, color = VirtualTextWhiteHigh)
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
                     Text(
                         text = "Security & Devices",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = VirtualTextPrimary
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = VirtualTextWhiteHigh
                     )
                 }
 
@@ -78,20 +85,20 @@ fun SecurityScreen(
 
                 Text(
                     text = "Paired Devices",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = VirtualTextPrimary
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = VirtualTextWhiteHigh
                 )
                 Text(
                     text = "Devices with authorized permanent streaming access",
                     fontSize = 13.sp,
-                    color = VirtualTextSecondary
+                    color = VirtualTextMuted
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
                 if (isLoading) {
-                    CircularProgressIndicator(color = VirtualBluePrimary, modifier = Modifier.align(Alignment.CenterHorizontally))
+                    CircularProgressIndicator(color = VirtualCyanGlow, modifier = Modifier.align(Alignment.CenterHorizontally))
                 } else if (pairings.isEmpty() && storage.pairedCameraId == null) {
                     Text(
                         text = "No actively paired devices.",
@@ -101,19 +108,19 @@ fun SecurityScreen(
                     )
                 } else {
                     LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
                         modifier = Modifier.weight(1f, fill = false)
                     ) {
                         if (pairings.isNotEmpty()) {
                             items(pairings) { p ->
                                 Card(
                                     modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = CardDefaults.cardColors(containerColor = VirtualBackground),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, VirtualBorder)
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = CardDefaults.cardColors(containerColor = VirtualGlassBg),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, VirtualGlassBorder)
                                 ) {
                                     Row(
-                                        modifier = Modifier.fillMaxWidth().padding(14.dp),
+                                        modifier = Modifier.fillMaxWidth().padding(16.dp),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
@@ -121,13 +128,13 @@ fun SecurityScreen(
                                             Text(
                                                 text = p.cameraDevice?.deviceName ?: "Paired Device",
                                                 fontWeight = FontWeight.Bold,
-                                                fontSize = 15.sp,
-                                                color = VirtualTextPrimary
+                                                fontSize = 16.sp,
+                                                color = VirtualTextWhiteHigh
                                             )
                                             Text(
                                                 text = "Paired: ${p.pairedAt?.take(10) ?: "Active"}",
                                                 fontSize = 12.sp,
-                                                color = VirtualTextSecondary
+                                                color = VirtualTextMuted
                                             )
                                         }
 
@@ -139,9 +146,9 @@ fun SecurityScreen(
                                                 }
                                             },
                                             colors = ButtonDefaults.buttonColors(containerColor = VirtualOfflineRed),
-                                            shape = RoundedCornerShape(8.dp)
+                                            shape = RoundedCornerShape(10.dp)
                                         ) {
-                                            Text("Revoke", fontSize = 12.sp, color = VirtualWhite)
+                                            Text("Revoke", fontSize = 13.sp, color = VirtualWhite, fontWeight = FontWeight.Bold)
                                         }
                                     }
                                 }
@@ -151,12 +158,12 @@ fun SecurityScreen(
                             item {
                                 Card(
                                     modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = CardDefaults.cardColors(containerColor = VirtualBackground),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, VirtualBorder)
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = CardDefaults.cardColors(containerColor = VirtualGlassBg),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, VirtualGlassBorder)
                                 ) {
                                     Row(
-                                        modifier = Modifier.fillMaxWidth().padding(14.dp),
+                                        modifier = Modifier.fillMaxWidth().padding(16.dp),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
@@ -164,13 +171,14 @@ fun SecurityScreen(
                                             Text(
                                                 text = storage.pairedCameraName ?: "Paired Camera",
                                                 fontWeight = FontWeight.Bold,
-                                                fontSize = 15.sp,
-                                                color = VirtualTextPrimary
+                                                fontSize = 16.sp,
+                                                color = VirtualTextWhiteHigh
                                             )
                                             Text(
                                                 text = "Permanent pairing active",
                                                 fontSize = 12.sp,
-                                                color = VirtualOnlineGreen
+                                                color = VirtualOnlineGreen,
+                                                fontWeight = FontWeight.SemiBold
                                             )
                                         }
 
@@ -180,9 +188,9 @@ fun SecurityScreen(
                                                 refreshPairings()
                                             },
                                             colors = ButtonDefaults.buttonColors(containerColor = VirtualOfflineRed),
-                                            shape = RoundedCornerShape(8.dp)
+                                            shape = RoundedCornerShape(10.dp)
                                         ) {
-                                            Text("Remove", fontSize = 12.sp, color = VirtualWhite)
+                                            Text("Remove", fontSize = 13.sp, color = VirtualWhite, fontWeight = FontWeight.Bold)
                                         }
                                     }
                                 }
@@ -199,12 +207,12 @@ fun SecurityScreen(
                         authRepository.logout()
                         onNavigateWelcome()
                     },
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(12.dp),
                     border = androidx.compose.foundation.BorderStroke(1.5.dp, VirtualOfflineRed),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = VirtualOfflineRed)
                 ) {
-                    Text("Logout & Clear Device", fontWeight = FontWeight.Bold)
+                    Text("Reset Device & Switch Role", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 }
             }
         }

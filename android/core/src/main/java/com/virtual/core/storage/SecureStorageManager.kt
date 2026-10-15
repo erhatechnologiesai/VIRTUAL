@@ -42,6 +42,7 @@ class SecureStorageManager private constructor(context: Context) {
         private const val KEY_PAIRED_CAMERA_ID = "paired_camera_id"
         private const val KEY_PAIRED_CAMERA_NAME = "paired_camera_name"
         private const val KEY_IS_PAIRED = "is_paired"
+        private const val KEY_CUSTOM_BASE_URL = "custom_base_url"
 
         @Volatile
         private var instance: SecureStorageManager? = null
@@ -52,6 +53,10 @@ class SecureStorageManager private constructor(context: Context) {
             }
         }
     }
+
+    var customBaseUrl: String?
+        get() = sharedPreferences.getString(KEY_CUSTOM_BASE_URL, null)
+        set(value) = sharedPreferences.edit().putString(KEY_CUSTOM_BASE_URL, value).apply()
 
     var accessToken: String?
         get() = sharedPreferences.getString(KEY_ACCESS_TOKEN, null)

@@ -4,8 +4,8 @@ import { sessionsService } from './sessions.service';
 import { AuthenticatedRequest } from '../middleware/auth';
 
 const startSessionSchema = z.object({
-  cameraDeviceId: z.string().uuid(),
-  viewerDeviceId: z.string().uuid()
+  cameraDeviceId: z.string().min(1, 'cameraDeviceId is required'),
+  viewerDeviceId: z.string().min(1, 'viewerDeviceId is required')
 });
 
 const endSessionSchema = z.object({

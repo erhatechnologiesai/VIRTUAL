@@ -109,6 +109,7 @@ class CameraForegroundService : Service(), SignalingListener, WebRtcEvents, Came
 
         // 5. Initialize Camera Conflict Detector
         cameraConflictDetector = CameraConflictDetector(this, this)
+        cameraConflictDetector?.isSelfCapturing = true
         cameraConflictDetector?.startMonitoring("0") // default back camera id
 
         // 6. Start telemetry reporting
@@ -128,10 +129,44 @@ class CameraForegroundService : Service(), SignalingListener, WebRtcEvents, Came
         webRtcManager = WebRtcManager(this, this)
         webRtcManager?.createPeerConnection()
 
-        videoCapturer = CameraCapturerHelper.createCameraCapturer(this, isFrontFacingCamera)
+        val eventsHandler = object : CameraVideoCapturer.CameraEventsHandler {
+            override fun onCameraError(errorDescription: String) {
+                Log.e(TAG, "WebRTC Camera error: $errorDescription")
+                cameraConflictDetector?.isSelfCapturing = false
+                onCameraConflictDetected("0")
+            }
+
+            override fun onCameraDisconnected() {
+                Log.w(TAG, "WebRTC Camera disconnected by OS (external conflict)")
+                cameraConflictDetector?.isSelfCapturing = false
+                onCameraConflictDetected("0")
+            }
+
+            override fun onCameraFreezed(errorDescription: String) {
+                Log.w(TAG, "WebRTC Camera frozen: $errorDescription")
+            }
+
+            override fun onCameraOpening(cameraName: String) {
+                Log.d(TAG, "WebRTC Camera opening: $cameraName")
+                cameraConflictDetector?.isSelfCapturing = true
+            }
+
+            override fun onFirstFrameAvailable() {
+                Log.d(TAG, "WebRTC Camera first frame available! Hardware stream healthy.")
+                cameraConflictDetector?.isSelfCapturing = true
+                isCameraHardwareBusy = false
+            }
+
+            override fun onCameraClosed() {
+                Log.d(TAG, "WebRTC Camera closed")
+            }
+        }
+
+        videoCapturer = CameraCapturerHelper.createCameraCapturer(this, isFrontFacingCamera, eventsHandler)
         val (width, height) = CameraCapturerHelper.getDimensionsForResolution(currentResolution)
 
         if (videoCapturer != null) {
+            cameraConflictDetector?.isSelfCapturing = true
             webRtcManager?.initLocalVideoTrack(videoCapturer!!, width, height, currentFps)
             webRtcManager?.initLocalAudioTrack(false) // Audio optional, default disabled
             Log.d(TAG, "Camera capturer initialized successfully")
@@ -223,11 +258,17 @@ class CameraForegroundService : Service(), SignalingListener, WebRtcEvents, Came
         currentViewerDeviceId = fromDeviceId
         currentSessionId = sessionId
 
+        // Always reset PeerConnection so new sessions and reconnect offers are accepted cleanly
+        webRtcManager?.resetPeerConnectionForNewSession()
+
         val sessionDescription = SessionDescription(SessionDescription.Type.OFFER, sdp)
-        webRtcManager?.setRemoteDescription(sessionDescription) {
+        webRtcManager?.setRemoteDescription(sessionDescription, onComplete = {
             // Generate Answer
+            Log.i(TAG, "Remote offer set successfully. Creating answer...")
             webRtcManager?.createAnswer()
-        }
+        }, onError = { err ->
+            Log.e(TAG, "Failed to set remote offer: $err")
+        })
     }
 
     override fun onAnswerReceived(fromDeviceId: String, sdp: String, sessionId: String?) {
@@ -255,9 +296,8 @@ class CameraForegroundService : Service(), SignalingListener, WebRtcEvents, Came
 
     // --- WebRTC Events ---
     override fun onIceCandidateGenerated(candidate: IceCandidate) {
-        currentViewerDeviceId?.let { viewerId ->
-            signalingClient?.sendIceCandidate(viewerId, candidate.sdpMid, candidate.sdpMLineIndex, candidate.sdp)
-        }
+        val viewerId = currentViewerDeviceId ?: "all_viewers"
+        signalingClient?.sendIceCandidate(viewerId, candidate.sdpMid, candidate.sdpMLineIndex, candidate.sdp)
     }
 
     override fun onLocalDescriptionGenerated(sdp: SessionDescription) {
@@ -291,6 +331,7 @@ class CameraForegroundService : Service(), SignalingListener, WebRtcEvents, Came
 
     // --- Camera Conflict Listener (Section 18) ---
     override fun onCameraConflictDetected(cameraId: String) {
+        if (isCameraHardwareBusy) return
         Log.w(TAG, "Camera conflict detected! Third-party app acquired camera.")
         isCameraHardwareBusy = true
         signalingClient?.sendCameraBusy(true, "Third-party camera app", currentViewerDeviceId)
@@ -300,8 +341,10 @@ class CameraForegroundService : Service(), SignalingListener, WebRtcEvents, Came
     }
 
     override fun onCameraAvailableAgain(cameraId: String) {
+        if (!isCameraHardwareBusy) return
         Log.i(TAG, "Camera conflict resolved. Hardware available again. Resuming stream.")
         isCameraHardwareBusy = false
+        cameraConflictDetector?.isSelfCapturing = true
         signalingClient?.sendCameraBusy(false, null, currentViewerDeviceId)
 
         // Resume video capture

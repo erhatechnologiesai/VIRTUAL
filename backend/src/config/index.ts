@@ -21,9 +21,9 @@ export const config = {
 
   webrtc: {
     stunUrl: process.env.STUN_SERVER_URL || 'stun:stun.l.google.com:19302',
-    turnUrl: process.env.TURN_SERVER_URL || 'turn:turn.virtualcam.io:3478',
-    turnUsername: process.env.TURN_USERNAME || 'virtual_turn_user',
-    turnPassword: process.env.TURN_PASSWORD || 'virtual_turn_secret_auth_token_99'
+    turnUrl: process.env.TURN_SERVER_URL || '',
+    turnUsername: process.env.TURN_USERNAME || '',
+    turnPassword: process.env.TURN_PASSWORD || ''
   },
 
   firebase: {

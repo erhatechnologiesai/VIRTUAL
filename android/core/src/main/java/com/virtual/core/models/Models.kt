@@ -54,8 +54,8 @@ data class PairingInfo(
     @SerializedName("viewer_device_id") val viewerDeviceId: String,
     @SerializedName("pairing_status") val pairingStatus: String,
     @SerializedName("paired_at") val pairedAt: String?,
-    val cameraDevice: Device?,
-    val viewerDevice: Device?
+    val cameraDevice: Device? = null,
+    val viewerDevice: Device? = null
 )
 
 data class CreatePairingResponse(
